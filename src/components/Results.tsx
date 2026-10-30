@@ -1,0 +1,13 @@
+'use client';
+import Link from 'next/link';
+import { Crosshair, Trophy, Users } from 'lucide-react';
+import { useRoom } from '@/hooks/useRoom';
+
+export function Results({code}:{code:string}) {
+  const {state,error}=useRoom(code);
+  if(!state) return <main className="grid min-h-dvh place-items-center bg-slate-950 p-6 text-slate-300"><div>{error || 'Loading mission results…'}<br/><Link href="/" className="mt-4 inline-block text-emerald-400">Return home</Link></div></main>;
+  const {room,players,catches}=state;
+  const seconds=room.started_at && room.ended_at ? Math.max(0,Math.round((new Date(room.ended_at).getTime()-new Date(room.started_at).getTime())/1000)) : 0;
+  return <main className="min-h-dvh bg-slate-950 px-5 py-8 text-white"><div className="mx-auto max-w-2xl"><div className="flex items-center gap-2 text-xs font-black tracking-[.2em]"><Crosshair size={19} className="text-emerald-400"/> MAZE-RUNNER<span className="text-emerald-400">.</span></div><div className="mt-12 rounded-2xl border border-emerald-400/20 bg-slate-900 p-6 text-center sm:p-10"><Trophy className="mx-auto text-emerald-400" size={35}/><p className="mt-5 font-mono text-xs tracking-[.2em] text-emerald-400">MISSION COMPLETE</p><h1 className="mt-3 text-4xl font-black uppercase">{room.winner ? `${room.winner} win` : 'Game ended'}</h1><p className="mt-3 text-sm text-slate-400">Room {code} · {Math.floor(seconds/60)}m {seconds%60}s played</p><div className="mt-8 grid grid-cols-2 gap-3"><div className="rounded-xl bg-slate-950 p-4"><p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Players</p><p className="mt-1 text-2xl font-black">{players.length}</p></div><div className="rounded-xl bg-slate-950 p-4"><p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">Confirmed catches</p><p className="mt-1 text-2xl font-black">{catches.filter(c=>c.status==='accepted').length}</p></div></div></div><section className="mt-5 rounded-2xl border border-slate-800 bg-slate-900 p-5"><h2 className="flex items-center gap-2 font-bold uppercase tracking-wider"><Users size={18} className="text-emerald-400"/> Final roster</h2><div className="mt-4 divide-y divide-slate-800">{players.map(p=><div key={p.id} className="flex items-center justify-between py-3"><span className="text-sm font-bold">{p.name}</span><span className={`font-mono text-xs uppercase ${p.role==='runner'?'text-emerald-400':'text-orange-400'}`}>{p.role}{p.eliminated?' · eliminated':''}</span></div>)}</div></section><Link href="/" className="mt-6 flex min-h-14 items-center justify-center rounded-xl bg-emerald-400 text-sm font-black uppercase tracking-wider text-slate-950">Back to home</Link></div></main>;
+}
+

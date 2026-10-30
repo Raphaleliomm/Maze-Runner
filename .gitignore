@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+.env*
+!.env.example
+*.tsbuildinfo
+supabase/.temp/
+coverage/
+/dist/
+.vinext/
+.cloudflare/
+.wrangler/
+/public/maplibre/
+/artifacts/

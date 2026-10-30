@@ -1,0 +1,36 @@
+name: Build iOS test app
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    runs-on: macos-26-intel
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx cap sync ios
+      - name: Compile unsigned iPhone app
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -derivedDataPath "$RUNNER_TEMP/ios-build" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/package/Payload"
+          cp -R "$RUNNER_TEMP/ios-build/Build/Products/Release-iphoneos/App.app" "$RUNNER_TEMP/package/Payload/"
+          cd "$RUNNER_TEMP/package"
+          zip -qry "$RUNNER_TEMP/Maze-Runner-unsigned.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Maze-Runner-iOS-unsigned
+          path: ${{ runner.temp }}/Maze-Runner-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7

@@ -1,2 +1,42 @@
-# Maze-Runner
+# Manhunt
 
+## iOS test build
+
+The Capacitor iOS project is under `ios/`. The private GitHub Actions workflow compiles an unsigned IPA with `CODE_SIGNING_ALLOWED=NO`; an Apple account must sign it before it can be installed on an iPhone. The native shell loads the deployed site, so it requires a network connection and changes to the web app can change the app's behavior. Background geolocation is requested only during a participating game after consent. Location uploads currently depend on the WebView's JavaScript callback and networking continuing to run; iOS may suspend these. Continuous delivery on a locked device has not been verified and may require a native upload implementation. Do not treat this build as proven background tracking until it is tested on physical devices.
+
+The deployed site is [Maze-Runner](https://maze-runner.raphaleliom.workers.dev). To update this Cloudflare Worker, use Node 24.22 or newer, authenticate Wrangler, set `CLOUDFLARE_ACCOUNT_ID` to the intended account, and run `npm run deploy:cloudflare`. The public Supabase configuration in `.env.local` is included in the client build. The locally generated database password is in the ignored `supabase/.temp/db-password` file; retain it securely. OpenFreeMap supplies the default vector basemap on a best-effort basis.
+
+A foreground-first GPS pursuit game built with Next.js, Supabase, and Leaflet. Players join with anonymous Supabase identities; room actions, proximity checks, ability use, and the game clock are authoritative in PostgreSQL. It requires an actual Supabase project and a licensed map tile service; there is no simulated multiplayer production mode.
+
+## Setup
+
+1. Install Node.js 20.9 or newer. Run `npm install`.
+2. Create a Supabase project. Enable **anonymous sign-ins** in Auth. Configure CAPTCHA and appropriate rate limits for anonymous sign-ins in a public deployment.
+3. Enable `pg_cron` if necessary, then apply `supabase/migrations/20261029000000_game.sql` as the database owner, using the Supabase SQL editor or migration tooling. The migration creates a five-second reconciliation job. Check `cron.job` and `cron.job_run_details` after deployment to ensure it is running. Reconciliation must run even when no browser is connected.
+4. Copy `.env.example` to `.env.local`, and fill in the project's URL and publishable/anon key. Do not put a service-role key in client environment variables.
+5. Configure a dark raster tile provider that permits your intended usage, and include its required attribution. For the example in `.env.example`, obtain a [CARTO Basemaps API key](https://www.carto.com/basemaps/apikey/) and review the [Basemaps terms](https://www.carto.com/legal/basemap-terms/) and plan limits. Do not use the example placeholder key in production. OpenStreetMap's public tile service is not a dark-tile provider or an unlimited production CDN.
+6. Run `npm run dev`, then open `http://localhost:3000`. Location APIs require a secure context: localhost is permitted for development, but other devices need an HTTPS deployment (or a secure tunnel). Deploy to Vercel with the same public environment variables and HTTPS. Add the deployed origin to Supabase's Auth URL configuration as appropriate.
+
+The service worker caches only a basic offline page, not game data, coordinates, or map tiles. Offline multiplayer and background tracking are not supported. On iOS and other mobile browsers, screen lock or switching apps can suspend geolocation and networking. Keep the game in the foreground.
+
+## How it works
+
+The host's first GPS fix becomes the play-area center. Each device signs in anonymously, consents to sharing, and retains its session across refreshes. Players can change roles and ready status in the lobby. The host chooses settings and starts once both teams are present. The server sets all phase, end, and next-ping timestamps. The scheduler reconciles them independently of browsers; ticks may be up to five seconds late under normal operation and later if the scheduler is disrupted. Missed ping intervals are skipped, not replayed.
+
+Runner live locations are stored in a private schema with no direct client table access. The only Realtime publication contains coordinate-free room invalidations, protected by room membership RLS. Clients fetch a filtered snapshot through a security-definer function: a player can see their own location and live Hunters; other Runners are not normally visible. A Hunter with active radar can retrieve live Runner positions only during their own 30-second authorization window. Scheduled pings are separate stationary snapshots; stale or inaccurate fixes are not published as new pings. Location history is not retained. Radar access is enforced at every snapshot request, though information already seen by a person or captured by their device cannot be recalled.
+
+Catch eligibility and confirmation are checked on the server using recent fixes and a capped accuracy allowance. GPS is imperfect and can be spoofed; a tag is a proximity-assisted claim confirmed by the Runner, not proof of physical contact. Explicitly leaving deletes the player's current location and stops local tracking. A network failure may delay the server receiving the leave action; old fixes are timestamped and become stale. The host transfers on an explicit leave; a disconnected host can return using the same anonymous session. Rooms and their data expire automatically, and coordinates are removed when the game ends.
+
+## Verification
+
+Run `npm run typecheck`, `npm run lint`, and `npm run build`. `npm test` runs geographic distance checks on Node 22.6 or newer. A local PostgreSQL-compatible smoke test is available as described in [supabase/tests/README.md](supabase/tests/README.md); it uses mocked auth and omits the actual Supabase Realtime and cron services. For backend integration checks, apply the migration to a **disposable** Supabase project and run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/game.sql` as its database owner. The script rolls back its test data. It exercises authorization, private location isolation, distance, transitions, pings, jammer, radar, and catch resolution; it does not replace a concurrent multi-session test or device testing.
+
+For a manual end-to-end check, use two independent browser profiles or devices with separate anonymous sessions. Create and join a room, select opposing roles, set a short ping interval and head start, and start. Check Hunter visibility and that Runner live coordinates are absent from the Hunter's snapshot before radar or a ping. Test ping timing, jammer, radar expiry, distance-based tag eligibility, reject/accept, refresh, leaving, and results. Use browser developer tools' location override for repeatable coordinates. Inspect the Realtime messages and network responses from the Hunter session for unintended Runner locations. Repeat with an unauthorized anonymous session. Test on HTTPS phones for permission handling, suspension and reconnect behavior. The scheduler and real-device tests require configured external infrastructure and cannot be inferred from a successful frontend build.
+
+Local verification on 2026-10-29: production build, TypeScript, ESLint, four distance tests, and the PGlite SQL smoke test passed. The landing and join pages were inspected at a phone-sized viewport. Actual Supabase migration, Auth, Realtime, cron execution, simultaneous transactions, and multi-device GPS gameplay were not verified in this environment because no configured Supabase project or PostgreSQL service was available. Treat those checks as release gates, not as passed tests.
+
+## Data retention and operation
+
+Rooms expire after 24 hours in the lobby, or 24 hours after the scheduled end when started. A scheduled job removes expired rooms and associated records and deletes invalidation events older than one hour. Configure database backups, monitoring, resource limits and appropriate legal/privacy notices for your deployment. Room codes are shared secrets, not a substitute for trusted participants. Avoid collecting location data in logs or analytics.
+
+Join attempts are limited per anonymous identity. A person can create new anonymous identities, so this limit alone does not prevent room-code guessing: deploy additional IP-based abuse controls and anonymous-auth protections. There is no automatic host transfer for a silent disconnect; a host who explicitly leaves transfers ownership to the earliest remaining player, while a disconnected host can reconnect with the same session.

@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: #020617;
+  color: #e2e8f0;
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+::selection { background: #10b981; color: #020617; }
+.leaflet-container { background: #0b1722; }
+.leaflet-control-attribution { font-size: 10px !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }

@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Isolated PostgreSQL logic smoke test; not a substitute for Supabase integration tests",
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.13"
+  }
+}
